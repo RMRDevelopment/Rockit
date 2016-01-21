@@ -115,7 +115,6 @@
 </style>
 <asp:UpdatePanel ID="upPayment" runat="server">
     <ContentTemplate>
-
         <asp:HiddenField ID="CollapsePersonData" ClientIDMode="Static" runat="server" Value="false" />
         <asp:HiddenField ID="CollapseCardData" ClientIDMode="Static" runat="server" Value="false"/>
 
@@ -189,6 +188,7 @@
                                                     <div class="col-md-6">
                                                         <Rock:DatePicker ID="dtpStartDate" runat="server" Label="First Payment" />
                                                     </div>
+                                                    <Rock:RockTextBox ID="txtCommentEntry" runat="server" Required="true" Label="Comment" />
                                                 </div>
                                             </div>
                                         </fieldset>
@@ -279,7 +279,7 @@
                                                         <ul class="card-logos list-unstyled">
                                                             <li class="card-visa"></li>
                                                             <li class="card-mastercard"></li>
-                                                            <li class="card-amex"></li>
+                                                            <!--<li class="card-amex"></li>-->
                                                             <li class="card-discover"></li>
                                                         </ul>
 
