@@ -2,30 +2,19 @@
 using Rock.Data;
 using Rock.Model;
 using Rock.Rest;
-using Rock.Attribute;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Web.Http;
-using System.Web.Http.OData;
 using Rock.Web.Cache;
-using System.Data.SqlClient;
 
-using System.Net.Http.Headers;
- 
-using Rock.Constants;
- 
 using Rock.Security;
-using Rock.Web;
- 
-using Rock.Web.UI;
-using Rock.Web.UI.Controls;
 
 
 using RestSharp;
+
 
 
 /// <summary>
@@ -71,7 +60,7 @@ public class MobileAppPrayerController : ApiControllerBase
             return Request.CreateResponse(result.StatusCode, result.StatusDescription);
         }
 
-    } 
+    }
 }
 
 [Authorize]
@@ -172,7 +161,7 @@ public class MobileAppProfileController : ApiControllerBase
         }
 
     }
- 
+
 }
 
 
@@ -199,13 +188,13 @@ public class MobileAppAboutController : ApiControllerBase
             //and return ok.
             return Request.CreateResponse(HttpStatusCode.OK, aboutText);
         }
-        catch (Exception ex) 
+        catch (Exception ex)
         {
             //todo: log the error somewhere. 
             return Request.CreateResponse(HttpStatusCode.InternalServerError);
         }
     }
-      
+
 }
 
 public class MobileAppLoginController : ApiControllerBase
@@ -227,10 +216,10 @@ public class MobileAppLoginController : ApiControllerBase
         {
 
             RestClient restClient = new RestClient(ApiUrls.BaseUrl);
- 
+
 
             var request = new RestRequest(string.Format(ApiUrls.LoginPostUrl), Method.POST);
- 
+
             request.AddJsonBody(login);
             var result = restClient.Execute(request);
 
@@ -238,12 +227,12 @@ public class MobileAppLoginController : ApiControllerBase
             {
                 var obj = new LoginReturnObject();
                 obj.Cookie = result.Cookies[0].Name + "=" + result.Cookies[0].Value;
-            
-                
+
+
 
                 var rc = new RockContext();
                 var u = new UserLoginService(rc).GetByUserName(login.Username);
-                 
+
                 if (u == null)
                     return Request.CreateResponse(HttpStatusCode.NotFound);
 
@@ -261,7 +250,7 @@ public class MobileAppLoginController : ApiControllerBase
             {
                 return Request.CreateResponse(result.StatusCode, result.StatusDescription);
             }
- 
+
         }
         catch (Exception ex)
         {
@@ -291,7 +280,7 @@ public class MobileAppRegisterController : ApiControllerBase
         try
         {
 
- 
+
             var rockContext = new RockContext();
             var personService = new PersonService(rockContext);
 
@@ -348,11 +337,11 @@ public class MobileAppRegisterController : ApiControllerBase
                 person.RecordTypeValueId = DefinedValueCache.Read(Rock.SystemGuid.DefinedValue.PERSON_RECORD_TYPE_PERSON.AsGuid()).Id;
 
 
-                
-        
 
-            //    person.ConnectionStatusValueId = DefinedValueCache.Read(GetAttributeValue("ConnectionStatus").AsGuid()).Id;
-              //  person.RecordStatusValueId = DefinedValueCache.Read(GetAttributeValue("RecordStatus").AsGuid());
+
+
+                //    person.ConnectionStatusValueId = DefinedValueCache.Read(GetAttributeValue("ConnectionStatus").AsGuid()).Id;
+                //  person.RecordStatusValueId = DefinedValueCache.Read(GetAttributeValue("RecordStatus").AsGuid());
 
                 person.Gender = Gender.Unknown;
 
@@ -390,9 +379,9 @@ public class MobileAppRegisterController : ApiControllerBase
 
             }
 
-            
+
             return Request.CreateResponse(HttpStatusCode.OK, "SUccess");
-  
+
 
         }
         catch (Exception ex)
@@ -437,6 +426,113 @@ public class MobileAppBackgroundController : ApiControllerBase
 }
 
 
+[Authorize]
+public class MobileAppCustomNotesController : ApiControllerBase
+{
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="messageId"></param>
+    /// <returns></returns>
+    public HttpResponseMessage Get(int messageId)
+    {
+        //verify the token passed from the app is valid. Just an extra security measure tp make sure they're hitting from the app.
+        var isAuthed = MobileAppAPIHelper.ValidateAppToken(Request);
+
+        //if this check fails, return Unauthorized
+        if (!isAuthed)
+            return Request.CreateResponse(HttpStatusCode.Unauthorized);
+
+        //get the authenticated user (cookie should have been passed in header, the [Authorize] makes sure it's valid.)
+        //make sure we can pull what we need from it, and find it by the username
+        var rockContext = new RockContext();
+        var u = new UserLoginService(rockContext);
+        var userProfileController = new MobileAppProfileController();
+
+        var p = userProfileController.User;
+        if (p == null)
+            return Request.CreateResponse(HttpStatusCode.Unauthorized);
+
+        var user = u.GetByUserName(p.Identity.Name);
+
+        if (user == null)
+            return Request.CreateResponse(HttpStatusCode.NotFound);
+
+
+        //if we got here, we can build the return object.
+        var m = "the note";
+        try
+        {
+
+            m = rockContext.Database.SqlQuery<string>(string.Format("SELECT Notes FROM [dbo].[_org_newpointe_CustomNotes] WHERE UserId = {0} AND MessageId = {1}", user.Id, messageId)).FirstOrDefault();
+
+            var decrrypted = Encryption.DecryptString(m);
+
+            //and return ok.
+            return Request.CreateResponse(HttpStatusCode.OK, decrrypted);
+        }
+        catch (Exception ex)
+        {
+            //todo: log the error somewhere. 
+            return Request.CreateResponse(HttpStatusCode.InternalServerError, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="note"></param>
+    /// <returns></returns>
+    public HttpResponseMessage Post(CustomNotePost note)
+    {
+        //verify the token passed from the app is valid. Just an extra security measure tp make sure they're hitting from the app.
+        var isAuthed = MobileAppAPIHelper.ValidateAppToken(Request);
+
+        if (!isAuthed)
+            return Request.CreateResponse(HttpStatusCode.Unauthorized);
+
+
+
+        //get the authenticated user (cookie should have been passed in header, the [Authorize] makes sure it's valid.)
+        //make sure we can pull what we need from it, and find it by the username
+        var rockContext = new RockContext();
+        var u = new UserLoginService(rockContext);
+        var userProfileController = new MobileAppProfileController();
+
+        var p = userProfileController.User;
+        if (p == null)
+            return Request.CreateResponse(HttpStatusCode.Unauthorized);
+
+        var user = u.GetByUserName(p.Identity.Name);
+
+        if (user == null)
+            return Request.CreateResponse(HttpStatusCode.NotFound);
+
+        //store the notes with the userid and message id. Encrypt notes. 
+        try
+        {
+
+            var encryped = Encryption.EncryptString(note.Notes);
+
+
+            rockContext.Database.ExecuteSqlCommand(string.Format("DELETE FROM [dbo].[_org_newpointe_CustomNotes] WHERE UserId = {0} AND MessageId = {1}", user.Id, note.MessageId));
+            rockContext.Database.ExecuteSqlCommand(string.Format("INSERT INTO [dbo].[_org_newpointe_CustomNotes] VALUES ({0},{1},'{2}')",user.Id, note.MessageId, encryped));
+
+            return Request.CreateResponse(HttpStatusCode.OK, "Success");
+
+        }
+        catch (Exception ex)
+        {
+            return Request.CreateResponse(HttpStatusCode.InternalServerError, "An error occurred.");
+        }
+    }
+
+}
+
+
+
+
 
 #region Custom API Stuff
 
@@ -450,7 +546,7 @@ public class ApiUrls
 }
 
 public class MobileAppAPIHelper
-{ 
+{
     /// <summary>
     /// this just verifies (loosely) that the request came from the app. By matching the key stored in the app's code. 
     /// </summary>
@@ -581,7 +677,7 @@ public class PrayerPost
 }
 
 public class LoginPost
-{  
+{
     public string Username { get; set; }
     public string Password { get; set; }
     public bool Persited { get; set; }
@@ -595,6 +691,12 @@ public class RegisterPost
     public string FirstName { get; set; }
     public string LastName { get; set; }
     public string Email { get; set; }
+}
+
+public class CustomNotePost
+{
+    public int MessageId { get; set; }
+    public string Notes { get; set; }
 }
 
 public class LoginReturnObject
